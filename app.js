@@ -11,21 +11,31 @@ const twit = new twitterBot({
     consumer_secret: process.env.API_KEY_SECRET,
     access_token: process.env.ACCESS_TOKEN,
     access_token_secret: process.env.ACCESS_TOKEN_SECRET,
-    triggerWord: 'himakom!'
+    triggerWord: 'ilkom!'
 });
 
 const doJob = async () => {
-    const userId = await twit.getAdminUserInfo();
-    const DM = await twit.getDirectMessages(userId);
-    // console.log(JSON.stringify(DM, null, 3));
+    try {
+        const userId = await twit.getAdminUserInfo();
+        const message = await twit.getDirectMessages(userId);
+        if (message.id) {
+            await twit.tweetMessage(message);
+        } else {
+            console.log("No tweet to post!");
+        }
+    } catch (error) {
+        console.log("======ERROR======");
+        console.log(error);
+    }
 }
 
 const job = new CronJob(
     "* */3 * * * *",
     doJob,
     null,
-    false,
+    true,
 );
+job.start();
 
 app.get("/", async (req, res) => {
     job.fireOnTick();
