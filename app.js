@@ -17,7 +17,7 @@ const twit = new twitterBot({
 const doJob = async () => {
     const userId = await twit.getAdminUserInfo();
     const DM = await twit.getDirectMessages(userId);
-    console.log(JSON.stringify(DM, null, 3));
+    // console.log(JSON.stringify(DM, null, 3));
 }
 
 const job = new CronJob(
