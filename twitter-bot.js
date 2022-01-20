@@ -8,6 +8,7 @@ class twitterBot {
             access_token: props.access_token,
             access_token_secret: props.access_token_secret,
         });
+        this.triggerWord = props.triggerWord;
     }
 
     getAdminUserInfo = () => {
@@ -16,14 +17,19 @@ class twitterBot {
                 .catch((err) => reject(err))
                 .then((result) => {
                     const userId = result.data.id_str;
-                    resolve(userId)
+                    resolve(userId);
                 });
         });
     };
 
-    getReceivedMessages = (messages, userId) => {
-        return messages.filter((msg) => msg.message_create.sender_id !== userId);
-    }
+    getReceivedMessages = (messages, userId, trigger) => {
+        const receivedMessages = messages.filter(
+            (msg) => msg.message_create.sender_id !== userId
+        );
+        return receivedMessages.filter((msg) =>
+            msg.message_create.message_data.text.includes(trigger)
+        );
+    };
 
     getDirectMessages = (userId) => {
         return new Promise((resolve, reject) => {
@@ -32,7 +38,11 @@ class twitterBot {
                     reject(error);
                 } else {
                     const messages = data.events;
-                    const receivedMessages = this.getReceivedMessages(messages, userId);
+                    const receivedMessages = this.getReceivedMessages(
+                        messages,
+                        userId,
+                        this.triggerWord
+                    );
                     resolve(receivedMessages);
                 }
             });

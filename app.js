@@ -11,12 +11,13 @@ const twit = new twitterBot({
     consumer_secret: process.env.API_KEY_SECRET,
     access_token: process.env.ACCESS_TOKEN,
     access_token_secret: process.env.ACCESS_TOKEN_SECRET,
+    triggerWord: 'himakom!'
 });
 
 const doJob = async () => {
     const userId = await twit.getAdminUserInfo();
     const DM = await twit.getDirectMessages(userId);
-    console.log(DM);
+    console.log(JSON.stringify(DM, null, 3));
 }
 
 const job = new CronJob(
