@@ -1,47 +1,66 @@
-const express = require("express");
-const { twitterBot } = require("./twitter-bot");
-const CronJob = require("cron").CronJob;
 require("dotenv").config();
 
-const app = express();
-const port = 3000;
+const express = require("express");
+const cors = require("cors");
+const CronJob = require("cron").CronJob;
 
-const twit = new twitterBot({
-    consumer_key: process.env.API_KEY,
-    consumer_secret: process.env.API_KEY_SECRET,
+const { TwitterBot } = require("./twitter-bot");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+const bot = new TwitterBot({
+    consumer_key: process.env.CONSUMER_KEY,
+    consumer_secret: process.env.CONSUMER_KEY_SECRET,
     access_token: process.env.ACCESS_TOKEN,
     access_token_secret: process.env.ACCESS_TOKEN_SECRET,
-    triggerWord: 'ilkom!'
+    triggerWord: process.env.TRIGGER,
 });
 
-const doJob = async () => {
+const job = new CronJob("0 */5 * * * *", doJob, onComplete, true);
+
+async function doJob() {
+    console.log(`execute @ ${new Date().toTimeString()}`);
+    let tempMessage = {};
     try {
-        const userId = await twit.getAdminUserInfo();
-        const message = await twit.getDirectMessages(userId);
+        const authenticatedUserId = await bot.getAdminUserInfo();
+        const message = await bot.getDirectMessage(authenticatedUserId);
         if (message.id) {
-            await twit.tweetMessage(message);
+            tempMessage = message;
+            const { data } = await bot.tweetMessage(message);
+            const response = await bot.deleteMessage(message);
+            console.log(
+                `... DM has been successfuly reposted with id: ${data.id} @ ${data.created_at}`
+            );
+            console.log("------------------------------------");
         } else {
-            console.log("No tweet to post!");
+            console.log("no tweet to post");
+            console.log("------------------------------------");
         }
     } catch (error) {
-        console.log("======ERROR======");
-        console.log(error);
+        console.log(error, "ERROR.");
+        console.log("------------------------------------");
+        if (tempMessage.id) {
+            await bot.deleteMessage(tempMessage);
+        }
     }
 }
 
-const job = new CronJob(
-    "* */3 * * * *",
-    doJob,
-    null,
-    true,
-);
-job.start();
+async function onComplete() {
+    console.log("my job is done!");
+}
 
-app.get("/", async (req, res) => {
-    job.fireOnTick();
+app.get("/", (req, res, next) => {
     res.send("Welcome to twitter bot server!");
 });
 
-app.listen(port, () => {
-    console.log(`Example app listening at http://localhost:${port}`);
+app.get("/trigger", async (req, res, next) => {
+    job.fireOnTick();
+    res.send("job triggered!");
 });
+
+app.listen(PORT, () => console.log(`Server is listening to port ${PORT}`));
