@@ -70,7 +70,6 @@ class TwitterBot {
             this.T.get("direct_messages/events/list", async (error, data) => {
                 try {
                     if (!error) {
-                        let lastMessage = {};
                         const messages = data.events;
                         const receivedMessages = this.getReceivedMessages(
                             messages,
@@ -84,16 +83,10 @@ class TwitterBot {
                             receivedMessages,
                             this.triggerWord
                         );
-
                         await this.deleteUnnecessaryMessages(
                             unnecessaryMessages
                         );
-                        // await this.deleteMoreThan280CharMsgs(triggerMessages);
-                        if (triggerMessages[0]) {
-                            lastMessage =
-                                triggerMessages[triggerMessages.length - 1];
-                        }
-                        resolve(lastMessage);
+                        resolve(triggerMessages.reverse().slice(0, 25));
                     } else {
                         reject("error on get direct message");
                     }

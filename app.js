@@ -21,32 +21,42 @@ const bot = new TwitterBot({
     triggerWord: process.env.TRIGGER,
 });
 
-const job = new CronJob("0 */5 * * * *", doJob, onComplete, false);
+const job = new CronJob("0 */5 * * * *", doJob, onComplete, true);
 
 async function doJob() {
     console.log(`execute @ ${new Date().toTimeString()}`);
     let tempMessage = {};
     try {
         const authenticatedUserId = await bot.getAdminUserInfo();
-        const message = await bot.getDirectMessage(authenticatedUserId);
-        if (message.id) {
-            tempMessage = message;
-            const { data, msg } = await bot.tweetMessage(message);
-            if(msg.length > 1){
-                const replyTweet = {
-                    data
-                };
-                for(let i = 1; i<msg.length; i++){
-                    const result = await bot.replyTweetMessage(msg[i], replyTweet.data)
-                    await bot.sleep(1000);
-                    replyTweet.data = result.data;
-                }
-            }
-            await bot.deleteMessage(message);
-            console.log(
-                `=== DM has been successfuly reposted with id: ${data.id} @ ${data.created_at} ===`
-            );
-            console.log("------------------------------------");
+        const messages = await bot.getDirectMessage(authenticatedUserId);
+        if (messages[0]) {
+            messages.forEach((message, index) => {
+                setTimeout(async () => {
+                    if (message.id) {
+                        tempMessage = message;
+                        const { data, msg } = await bot.tweetMessage(message);
+                        if (msg.length > 1) {
+                            const replyTweet = {
+                                data,
+                            };
+                            for (let i = 1; i < msg.length; i++) {
+                                const result = await bot.replyTweetMessage(
+                                    msg[i],
+                                    replyTweet.data
+                                );
+                                await bot.sleep(1000);
+                                replyTweet.data = result.data;
+                            }
+                        }
+                        await bot.deleteMessage(message);
+                        console.log(
+                            `=== DM has been successfuly reposted with id: ${data.id} @ ${data.created_at} ===`
+                        );
+                        console.log("------------------------------------");
+                    }
+                }, index * 10000);
+            });
+            console.log("ALL DONE!");
         } else {
             console.log("no tweet to post");
             console.log("------------------------------------");
