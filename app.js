@@ -21,7 +21,7 @@ const bot = new TwitterBot({
     triggerWord: process.env.TRIGGER,
 });
 
-const job = new CronJob("0 */5 * * * *", doJob, onComplete, true);
+const job = new CronJob("0 */5 * * * *", doJob, onComplete, false);
 
 async function doJob() {
     console.log(`execute @ ${new Date().toTimeString()}`);
@@ -31,10 +31,20 @@ async function doJob() {
         const message = await bot.getDirectMessage(authenticatedUserId);
         if (message.id) {
             tempMessage = message;
-            const { data } = await bot.tweetMessage(message);
-            const response = await bot.deleteMessage(message);
+            const { data, msg } = await bot.tweetMessage(message);
+            if(msg.length > 1){
+                const replyTweet = {
+                    data
+                };
+                for(let i = 1; i<msg.length; i++){
+                    const result = await bot.replyTweetMessage(msg[i], replyTweet.data)
+                    await bot.sleep(1000);
+                    replyTweet.data = result.data;
+                }
+            }
+            await bot.deleteMessage(message);
             console.log(
-                `... DM has been successfuly reposted with id: ${data.id} @ ${data.created_at}`
+                `=== DM has been successfuly reposted with id: ${data.id} @ ${data.created_at} ===`
             );
             console.log("------------------------------------");
         } else {

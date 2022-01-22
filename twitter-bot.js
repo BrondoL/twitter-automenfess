@@ -1,7 +1,7 @@
 const Twit = require("twit");
 const fs = require("fs");
 
-const { downloadMedia } = require("./download");
+const { downloadMedia } = require("./downloader");
 
 class TwitterBot {
     constructor(props) {
@@ -37,29 +37,29 @@ class TwitterBot {
 
     getUnnecessaryMessages = (receivedMessages, trigger) => {
         return receivedMessages.filter((msg) => {
-            const message = msg.message_create.message_data.text; // 'Halo nama gw yoga coy!'
-            const words = this.getEachWord(message); // ['Halo', 'nama', 'gw', 'yoga', 'coy!']
+            const message = msg.message_create.message_data.text;
+            const words = this.getEachWord(message);
             return !words.includes(trigger);
         });
     };
 
     getTriggerMessages = (receivedMessages, trigger) => {
         return receivedMessages.filter((msg) => {
-            const message = msg.message_create.message_data.text; // 'Halo nama gw yoga coy!'
-            const words = this.getEachWord(message); // ['Halo', 'nama', 'gw', 'yoga', 'coy!']
+            const message = msg.message_create.message_data.text;
+            const words = this.getEachWord(message);
             return words.includes(trigger);
         });
     };
 
     getEachWord = (message) => {
-        let words = []; // ['ini', 'line,', 'pertama', 'ini', ...]
-        let finalWords = []; // ['ini', 'line', ',', 'pertama', ....]
-        const separateEnter = message.split("\n"); // ['ini line, pertama', 'ini line kedua']
+        let words = [];
+        let finalWords = [];
+        const separateEnter = message.split("\n");
         separateEnter.forEach(
             (line) => (words = [...words, ...line.split(" ")])
         );
         words.forEach((word) => {
-            const splitComma = word.split(","); // ['line', ',']
+            const splitComma = word.split(",");
             finalWords = [...finalWords, ...splitComma];
         });
         return finalWords;
@@ -88,7 +88,7 @@ class TwitterBot {
                         await this.deleteUnnecessaryMessages(
                             unnecessaryMessages
                         );
-                        await this.deleteMoreThan280CharMsgs(triggerMessages);
+                        // await this.deleteMoreThan280CharMsgs(triggerMessages);
                         if (triggerMessages[0]) {
                             lastMessage =
                                 triggerMessages[triggerMessages.length - 1];
@@ -148,16 +148,14 @@ class TwitterBot {
     tweetMessage = (message) => {
         return new Promise(async (resolve, reject) => {
             try {
-                const text = message.message_create.message_data.text;
+                const status = this.sliceMessage(message);
+                const payload = {
+                    status: status[0],
+                };
                 const attachment =
                     message.message_create.message_data.attachment;
-                const payload = {
-                    status: text,
-                };
                 if (attachment) {
                     const media = attachment.media;
-                    const shortUrl = attachment.media.url;
-                    payload.status = text.split(shortUrl)[0];
                     const type = attachment.media.type;
                     let mediaUrl = "";
                     if (type === "animated_gif") {
@@ -188,6 +186,7 @@ class TwitterBot {
                         resolve({
                             message: `successfuly posting new status with DM id ${message.id}`,
                             data,
+                            msg: status,
                         });
                     } else {
                         reject(error);
@@ -195,6 +194,32 @@ class TwitterBot {
                 });
             } catch (error) {
                 reject(error);
+            }
+        });
+    };
+
+    replyTweetMessage = (message, status) => {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const payload = {
+                    in_reply_to_status_id: status.id_str,
+                    status: `@${status.user.screen_name} ${message}`,
+                };
+                this.T.post("statuses/update", payload, (error, data) => {
+                    if (!error) {
+                        console.log(
+                            `successfuly reply tweet with status id ${status.id}`
+                        );
+                        resolve({
+                            message: `successfuly reply tweet with status id ${status.id}`,
+                            data,
+                        });
+                    } else {
+                        reject(error);
+                    }
+                });
+            } catch (error) {
+                reject(error)
             }
         });
     };
@@ -213,32 +238,41 @@ class TwitterBot {
         }
     };
 
-    deleteMoreThan280CharMsgs = async (triggerMessages) => {
-        try {
-            let moreThan280 = [];
-            for (const [i, msg] of triggerMessages.entries()) {
-                let text = msg.message_create.message_data.text;
-                const attachment = msg.message_create.message_data.attachment;
-                if (attachment) {
-                    const shortUrl = attachment.media.url;
-                    text = text.split(shortUrl)[0];
-                }
-                if (text.length > 280) {
-                    moreThan280.push(msg);
-                    await this.deleteMessage(msg);
-                    await this.sleep(2000);
-                }
-                if (i + 1 === 3) {
+    splitByLength = (message) => {
+        const splitText = message.split(" ");
+        const msg = [];
+        const n = Math.ceil(message.length / 250);
+        const m = Math.ceil(splitText.length / n);
+        for (let i = 0; i < n; i++) {
+            let tweet = "";
+            for (let j = m * i; j < m * (i + 1); j++) {
+                if (!splitText[j]) {
                     break;
                 }
+                if (j % m === 0) {
+                    tweet = tweet + splitText[j];
+                } else {
+                    tweet = tweet + " " + splitText[j];
+                }
             }
-            for (const msg of moreThan280) {
-                const idx = triggerMessages.indexOf(msg);
-                triggerMessages.splice(idx, 1);
+            if (i !== n - 1) {
+                tweet = tweet + " (cont)";
+                msg.push(tweet);
+            } else {
+                msg.push(tweet);
             }
-        } catch (error) {
-            throw error;
         }
+        return msg;
+    };
+
+    sliceMessage = (msg) => {
+        let text = msg.message_create.message_data.text;
+        const attachment = msg.message_create.message_data.attachment;
+        if (attachment) {
+            const shortUrl = attachment.media.url;
+            text = text.split(shortUrl)[0];
+        }
+        return this.splitByLength(text);
     };
 
     deleteMessage = (message) => {
