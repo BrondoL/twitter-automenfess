@@ -21,7 +21,7 @@ const bot = new TwitterBot({
     triggerWord: process.env.TRIGGER,
 });
 
-const job = new CronJob("0 */5 * * * *", doJob, onComplete, true);
+const job = new CronJob("0 */5 * * * *", doJob, onComplete, false);
 
 async function doJob() {
     console.log(`execute @ ${new Date().toTimeString()}`);
@@ -32,6 +32,7 @@ async function doJob() {
         if (messages[0]) {
             messages.forEach((message, index) => {
                 setTimeout(async () => {
+                    console.log(`${index + 1}. PROCESSING...`);
                     if (message.id) {
                         tempMessage = message;
                         const { data, msg } = await bot.tweetMessage(message);
@@ -54,9 +55,11 @@ async function doJob() {
                         );
                         console.log("------------------------------------");
                     }
+                    if(index===messages.length-1){
+                        console.log("ALL DONE!");
+                    }
                 }, index * 10000);
             });
-            console.log("ALL DONE!");
         } else {
             console.log("no tweet to post");
             console.log("------------------------------------");
